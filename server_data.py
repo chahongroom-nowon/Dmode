@@ -7,6 +7,7 @@ from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import threading
 import time
+import signal
 
 # 데이터 파일 경로
 DATA_FILE = 'shared_data.json'
@@ -100,13 +101,20 @@ class DataHandler(BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
+# SIGINT 시그널 무시 함수
+def ignore_sigint(signum, frame):
+    pass
+
 # 서버 시작
 def start_server():
+    # Ctrl+C 시그널 무시
+    signal.signal(signal.SIGINT, ignore_sigint)
+    
     load_data()
     server = HTTPServer(('0.0.0.0', 8000), DataHandler)
     print("실시간 동기화 서버가 시작되었습니다!")
     print("다른 PC에서 접속: http://172.30.1.32:8000")
-    print("서버를 중지하려면 Ctrl+C를 누르세요.")
+    print("서버가 실행 중입니다.")
     server.serve_forever()
 
 if __name__ == '__main__':
