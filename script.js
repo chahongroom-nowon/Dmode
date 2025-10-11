@@ -304,6 +304,16 @@ function createEmployeeCard(employee, teamName, index) {
     const card = document.createElement('div');
     card.className = 'employee-card';
     
+    // 휴무 상태 확인
+    const date = new Date(currentDate);
+    const mmdd = `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    const isOnVacation = vacations.some(vac => vac.employeeId === employee.id && vac.date === mmdd);
+    
+    // 휴무 중인 경우 카드 스타일 변경
+    if (isOnVacation) {
+        card.classList.add('vacation-card');
+    }
+    
     const info = document.createElement('div');
     info.className = 'employee-info';
     
@@ -313,30 +323,36 @@ function createEmployeeCard(employee, teamName, index) {
     const breakInfo = document.createElement('div');
     breakInfo.className = 'break-info';
     
-    // 휴식 시간 정보 처리
-    const breakDown = employee.breakDown || '';
-    const breakUp = employee.breakUp || '';
-    
-    let timeDiffStr = '';
-    let statusText = '';
-    
-    if (breakDown && breakUp) {
-        // 시간 차이 계산
-        const downTime = new Date(`2000-01-01T${breakDown}:00`);
-        const upTime = new Date(`2000-01-01T${breakUp}:00`);
-        const diffMs = upTime - downTime;
-        const minutes = Math.floor(diffMs / 60000);
-        timeDiffStr = ` [${minutes}분]`;
-        statusText = `내려온 시간: ${breakDown}<br>올라온 시간: ${breakUp}`;
-    } else if (breakDown && !breakUp) {
-        timeDiffStr = ' [밥 먹는중...]';
-        statusText = `내려온 시간: ${breakDown}<br>올라온 시간: -`;
+    // 휴무 상태에 따른 정보 표시
+    if (isOnVacation) {
+        name.innerHTML = `${employee.name} [휴무중]`;
+        breakInfo.innerHTML = '🏖️ 임시휴무 처리됨';
     } else {
-        statusText = '배고파용 8ㅅ8';
+        // 휴식 시간 정보 처리
+        const breakDown = employee.breakDown || '';
+        const breakUp = employee.breakUp || '';
+        
+        let timeDiffStr = '';
+        let statusText = '';
+        
+        if (breakDown && breakUp) {
+            // 시간 차이 계산
+            const downTime = new Date(`2000-01-01T${breakDown}:00`);
+            const upTime = new Date(`2000-01-01T${breakUp}:00`);
+            const diffMs = upTime - downTime;
+            const minutes = Math.floor(diffMs / 60000);
+            timeDiffStr = ` [${minutes}분]`;
+            statusText = `내려온 시간: ${breakDown}<br>올라온 시간: ${breakUp}`;
+        } else if (breakDown && !breakUp) {
+            timeDiffStr = ' [밥 먹는중...]';
+            statusText = `내려온 시간: ${breakDown}<br>올라온 시간: -`;
+        } else {
+            statusText = '배고파용 8ㅅ8';
+        }
+        
+        name.innerHTML = `${employee.name}${timeDiffStr}`;
+        breakInfo.innerHTML = statusText;
     }
-    
-    name.innerHTML = `${employee.name}${timeDiffStr}`;
-    breakInfo.innerHTML = statusText;
     
     info.appendChild(name);
     info.appendChild(breakInfo);
@@ -344,20 +360,38 @@ function createEmployeeCard(employee, teamName, index) {
     const actions = document.createElement('div');
     actions.className = 'employee-actions';
     
-    const recordBtn = document.createElement('button');
-    recordBtn.className = 'action-btn record-btn';
-    recordBtn.innerHTML = '⏱️';
-    recordBtn.title = '휴식 시간 기록';
-    recordBtn.addEventListener('click', () => recordBreakTime(employee.id, teamName, index));
+    // 휴무 버튼 추가 (상태에 따라 다른 아이콘과 텍스트)
+    const vacationBtn = document.createElement('button');
+    vacationBtn.className = 'action-btn vacation-btn';
+    if (isOnVacation) {
+        vacationBtn.innerHTML = '❌';
+        vacationBtn.title = '휴무 취소';
+        vacationBtn.classList.add('vacation-active');
+    } else {
+        vacationBtn.innerHTML = '🏖️';
+        vacationBtn.title = '임시휴무';
+    }
+    vacationBtn.addEventListener('click', () => toggleVacation(employee.id, teamName, index));
     
-    const cancelBtn = document.createElement('button');
-    cancelBtn.className = 'action-btn cancel-btn';
-    cancelBtn.innerHTML = '❌';
-    cancelBtn.title = '기록 취소';
-    cancelBtn.addEventListener('click', () => cancelBreakTime(employee.id, teamName, index));
+    // 휴무 중이 아닐 때만 휴식 관련 버튼 표시
+    if (!isOnVacation) {
+        const recordBtn = document.createElement('button');
+        recordBtn.className = 'action-btn record-btn';
+        recordBtn.innerHTML = '⏱️';
+        recordBtn.title = '휴식 시간 기록';
+        recordBtn.addEventListener('click', () => recordBreakTime(employee.id, teamName, index));
+        
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'action-btn cancel-btn';
+        cancelBtn.innerHTML = '❌';
+        cancelBtn.title = '기록 취소';
+        cancelBtn.addEventListener('click', () => cancelBreakTime(employee.id, teamName, index));
+        
+        actions.appendChild(recordBtn);
+        actions.appendChild(cancelBtn);
+    }
     
-    actions.appendChild(recordBtn);
-    actions.appendChild(cancelBtn);
+    actions.appendChild(vacationBtn);
     
     card.appendChild(info);
     card.appendChild(actions);
@@ -429,6 +463,100 @@ function cancelBreakTime(employeeId, teamName, index) {
     saveData();
     loadEmployees();
     showMessage('기록이 취소되었습니다.', 'success');
+}
+
+// 임시휴무 토글
+function toggleVacation(employeeId, teamName, index) {
+    const employee = employees.find(emp => emp.id === employeeId);
+    if (!employee) {
+        showMessage('직원을 찾을 수 없습니다.', 'error');
+        return;
+    }
+    
+    const date = new Date(currentDate);
+    const mmdd = `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    
+    // 이미 휴가가 등록되어 있는지 확인
+    const existingVacation = vacations.find(vac => 
+        vac.employeeId === employeeId && vac.date === mmdd
+    );
+    
+    if (existingVacation) {
+        // 휴가 취소
+        if (confirm(`${employee.name}님의 임시휴무를 취소하시겠습니까?`)) {
+            vacations = vacations.filter(vac => vac.id !== existingVacation.id);
+            saveData();
+            loadEmployees();
+            showMessage(`${employee.name}님의 임시휴무가 취소되었습니다.`, 'success');
+        }
+    } else {
+        // 휴가 등록
+        if (confirm(`${employee.name}님을 임시휴무로 처리하시겠습니까?`)) {
+            vacations.push({
+                id: Date.now(),
+                employeeId,
+                date: mmdd
+            });
+            saveData();
+            loadEmployees();
+            showMessage(`${employee.name}님이 임시휴무로 처리되었습니다.`, 'success');
+        }
+    }
+}
+
+// 화면 캡처하여 텔레그램 전송
+async function captureAndSendTelegram() {
+    try {
+        showMessage('화면을 캡처하고 있습니다...', 'info');
+        
+        // 메인 콘텐츠 영역 캡처
+        const element = document.querySelector('.main-content');
+        
+        const canvas = await html2canvas(element, {
+            backgroundColor: '#ffffff',
+            scale: 1,
+            useCORS: true,
+            allowTaint: true,
+            width: element.scrollWidth,
+            height: element.scrollHeight
+        });
+        
+        // 캔버스를 base64 이미지로 변환
+        const imageData = canvas.toDataURL('image/png');
+        
+        // 현재 날짜와 시간 정보 추가
+        const dateStr = formatDateDisplay(currentDate);
+        const currentTime = new Date().toLocaleTimeString();
+        
+        const caption = `📋 *차홍룸 노원점 D모드 현황*\n\n📅 ${dateStr}\n⏰ 캡처 시간: ${currentTime}`;
+        
+        // 서버로 이미지 전송 요청
+        const response = await fetch('/api/telegram-image', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                image: imageData,
+                caption: caption
+            })
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            if (result.status === 'success') {
+                showMessage('화면 캡처가 텔레그램으로 전송되었습니다.', 'success');
+            } else {
+                showMessage('텔레그램 전송에 실패했습니다.', 'error');
+            }
+        } else {
+            showMessage('텔레그램 전송에 실패했습니다.', 'error');
+        }
+        
+    } catch (error) {
+        console.error('화면 캡처 오류:', error);
+        showMessage('화면 캡처 중 오류가 발생했습니다.', 'error');
+    }
 }
 
 // 메시지 표시
@@ -888,6 +1016,9 @@ function setupEventListeners() {
     elements.datePickerBtn.addEventListener('click', openDateModal);
     elements.currentDateDisplay.addEventListener('click', openDateModal);
     document.getElementById('confirm-date').addEventListener('click', confirmDate);
+    
+    // 텔레그램 화면 캡처
+    document.getElementById('telegram-capture-btn').addEventListener('click', captureAndSendTelegram);
     
     // 직원 관리
     document.getElementById('add-junior-btn').addEventListener('click', () => {
