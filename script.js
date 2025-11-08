@@ -1052,6 +1052,12 @@ function setupEventListeners() {
         openCancelVacationModal();
     });
     
+    // 매출
+    document.getElementById('sales-btn').addEventListener('click', () => {
+        closeHamburgerMenu();
+        window.location.href = 'sales.html';
+    });
+    
     // 관리자
     document.getElementById('admin-btn').addEventListener('click', () => {
         closeHamburgerMenu();

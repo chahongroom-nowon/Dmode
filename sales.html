@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>매출 확인 - 차홍룸 노원점</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .sales-container {
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+        
+        .back-btn {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .back-btn:hover {
+            background-color: #0056b3;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 50px;
+        }
+        
+        .loading i {
+            font-size: 48px;
+            color: #007bff;
+            animation: spin 2s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .sales-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .summary-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .summary-card h3 {
+            margin: 0 0 10px 0;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .summary-card .amount {
+            font-size: 32px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        
+        .sales-table {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .table-header {
+            background: #f8f9fa;
+            padding: 15px;
+            border-bottom: 2px solid #dee2e6;
+        }
+        
+        .table-header h3 {
+            margin: 0;
+            color: #333;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .error-message {
+            text-align: center;
+            padding: 50px;
+            color: #dc3545;
+        }
+        
+        .error-message i {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="sales-container">
+        <div class="header">
+            <h1><i class="fas fa-chart-line"></i> 매출 확인</h1>
+            <button class="back-btn" onclick="window.location.href='index.html'">
+                <i class="fas fa-arrow-left"></i> 돌아가기
+            </button>
+        </div>
+        
+        <div id="loading" class="loading">
+            <i class="fas fa-spinner"></i>
+            <p>매출 정보를 불러오는 중...</p>
+        </div>
+        
+        <div id="content" style="display: none;">
+            <div class="sales-summary" id="summary"></div>
+            <div class="sales-table">
+                <div class="table-header">
+                    <h3>상세 매출 내역</h3>
+                </div>
+                <table id="sales-table">
+                    <thead>
+                        <tr>
+                            <th>날짜</th>
+                            <th>시간</th>
+                            <th>고객</th>
+                            <th>서비스</th>
+                            <th>금액</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sales-tbody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div id="error" class="error-message" style="display: none;">
+            <i class="fas fa-exclamation-triangle"></i>
+            <h3>매출 정보를 불러올 수 없습니다.</h3>
+            <p>잠시 후 다시 시도해주세요.</p>
+        </div>
+    </div>
+    
+    <script>
+        // 페이지 로드 시 매출 정보 가져오기
+        async function loadSalesData() {
+            try {
+                const response = await fetch('/api/sales-data');
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    displaySalesData(data.data);
+                } else {
+                    showError();
+                }
+            } catch (error) {
+                console.error('매출 데이터 로드 오류:', error);
+                showError();
+            }
+        }
+        
+        function displaySalesData(data) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('content').style.display = 'block';
+            
+            // 요약 정보 표시
+            const summary = data.summary || {};
+            const summaryHTML = `
+                <div class="summary-card">
+                    <h3>오늘 매출</h3>
+                    <div class="amount">${formatNumber(summary.today || 0)}원</div>
+                </div>
+                <div class="summary-card">
+                    <h3>이번 주 매출</h3>
+                    <div class="amount">${formatNumber(summary.week || 0)}원</div>
+                </div>
+                <div class="summary-card">
+                    <h3>이번 달 매출</h3>
+                    <div class="amount">${formatNumber(summary.month || 0)}원</div>
+                </div>
+                <div class="summary-card">
+                    <h3>총 예약 건수</h3>
+                    <div class="amount">${summary.totalBookings || 0}건</div>
+                </div>
+            `;
+            document.getElementById('summary').innerHTML = summaryHTML;
+            
+            // 상세 내역 표시
+            const tbody = document.getElementById('sales-tbody');
+            tbody.innerHTML = '';
+            
+            const sales = data.sales || [];
+            sales.forEach(item => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${item.date || '-'}</td>
+                    <td>${item.time || '-'}</td>
+                    <td>${item.customer || '-'}</td>
+                    <td>${item.service || '-'}</td>
+                    <td>${formatNumber(item.amount || 0)}원</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+        
+        function formatNumber(num) {
+            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        }
+        
+        function showError() {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('error').style.display = 'block';
+        }
+        
+        // 페이지 로드 시 실행
+        window.addEventListener('DOMContentLoaded', loadSalesData);
+    </script>
+</body>
+</html>
+
+
